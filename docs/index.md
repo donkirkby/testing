@@ -8,12 +8,10 @@ but it's a nice compilation of what I've read and learned over the years. This
 version is adapted for Python.
 
 ## Whaddya mean, test? ##
-> A whale is not a fish, it's an insect.
-
+> A whale is not a fish, it's an insect.  
 > *Peter Cook*
 
-> A unit test is not a test, it's a specification.
-
+> A unit test is not a test, it's a specification.  
 > *Agile development mindset*
 
 One of these is a joke, and one is a useful way to think about the world. When

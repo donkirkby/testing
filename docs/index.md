@@ -135,6 +135,167 @@ lot safer when you have the tests to catch mistakes.
 
 [refactoring]: http://www.refactoring.com/
 
+## Mock Objects ##
+Code can be hard to test when it depends on some external system like the file
+system, a database, or a web service. External dependencies can make a test
+slow and brittle, and it's often hard to test failure scenarios.
+
+One way to make this kind of code easier to test is to replace the external
+system with a mock version of it. As an example, imagine I want to write a
+function that fetches a list of a user's repositories from GitHub and returns
+a list of the repository names. Here's what the GitHub API looks like:
+
+    $ curl -s https://api.github.com/users/donkirkby/repos | head
+    [
+      {
+        "id": 50468387,
+        "name": "active_sinatra",
+        "full_name": "donkirkby/active_sinatra",
+        "owner": {
+          "login": "donkirkby",
+          "id": 1639148,
+          "avatar_url": "https://avatars.githubusercontent.com/u/1639148?v=3",
+          "gravatar_id": "",
+    
+This fetches the list of my repositories, and prints the first few lines. You
+can see that it's a JSON response with a list of dictionaries. Each dictionary
+has the name of a repository, plus a bunch of other data we don't care about.
+
+To write a test for this, we can use the mock module. It's included with
+Python 3 and available separately for Python 2. Here's the test that patches
+the `requests.get()` function with a mock version.
+
+    # test_github_util.py
+    from mock import patch
+    from unittest import TestCase
+    
+    from github_util import fetch_repo_names
+    
+    
+    class GithubUtilTest(TestCase):
+        @patch('requests.get')
+        def test_fetch_repo_names(self, mock_get):
+            mock_get.return_value.json.return_value = [
+                {"name": "first"},
+                {"name": "second"}]
+            expected_names = ['first', 'second']
+    
+            names = fetch_repo_names('joesmith')
+    
+            self.assertEqual(expected_names, names)
+
+Now when the main code calls `requests.get()`, it will return a mock response
+with a `json()` method that returns the list of dictionaries. Once we see that
+this test fails, we can write the code.
+
+    # github_util.py
+    import requests
+    
+    
+    def fetch_repo_names(username):
+        url = ('https://api.github.com/users/{}'
+               '/repos'.format(username))
+        repos = requests.get(url).json()
+        return [repo['name'] for repo in repos]
+
+
+Mocking in Python is amazing, because nothing is private! You can avoid all the
+gymnastics required in statically typed languages, you just have to be careful
+to clean up after yourself. Also, be sure that your mock objects behave in a
+realistic way. If the real system gives very different responses, the mock tests
+won't help.
+
+In some situations, you may want to check what happened to the mock object
+at the end of the test. In the example, you could check that your code passed the
+correct parameters to the mock object.
+
+            mock_get.assert_called_once_with(
+                'https://api.github.com/users/joesmith/repos')
+
+However, I only do this when there's some interesting calculation in the
+parameter values. The more you lock down the mock object, the more brittle the
+test will be.
+
+## Mocking Django ##
+The Django web framework provides a nice test framework that creates a database
+from your migrations, bulk loads sample data, and cleans up after each test by
+rolling back a transaction. However, all of that database work can be slow! You
+can speed it up by using an in-memory SQLite3 database, but it's only about
+twice as fast, and the SQLite3 database may behave differently from your
+regular database.
+
+We've had some success converting many of our Django tests to pure unit tests
+that don't use any database. In my [source code][] you'll find `udjango.py` that
+contains a trivial example of some model classes.
+
+    class City(models.Model):
+        name = models.CharField(max_length=100)
+
+    class Person(models.Model):
+        name = models.CharField(max_length=50)
+        city = models.ForeignKey(City, related_name='residents')
+
+        def count_dependents(self):
+            return self.children.count()
+
+    class Child(models.Model):
+        parent = models.ForeignKey(Person, related_name='children')
+        name = models.CharField(max_length=255)
+
+Notice that the name fields and the foreign keys are required fields. A typical
+test for the `count_dependents()` method needs to do a bunch of setup before it
+can start the actual test. The city object is completely unrelated to the test,
+but we need to create it before we can create a person object. In a real
+application there's often much more setup.
+
+    city = City.objects.create(name='Vancouver')
+    dad = Person.objects.create(name='Dad', city=city)
+    dad.children.create(name='Bobby')
+    dad.children.create(name='Suzy')
+
+    # Actual test
+    dependent_count = dad.count_dependents()
+
+    # Validation
+    assert dependent_count == 2, dependent_count
+
+Here's a test from `udjango_mocked.py` for the same function. It mocks out the
+database call to `self.children.count()`. Notice how much less setup is needed.
+
+    with patch.object(Person, 'children') as mock_children:
+        mock_children.count.return_value = 2
+        dad = Person()
+
+        # Actual test
+        dependent_count = dad.count_dependents()
+
+        # Validation
+        assert dependent_count == 2, dependent_count
+
+In our projects, we've found an even better technique using the
+[`django_mock_queries`][mock_queries] library. It lets your code use
+`count()`, `order_by()`, `filter()`, and many other features of a query set without
+needing a real database. Here's an example from `udjango_mock_set.py`.
+
+    with patch.object(Person,
+                      'children',
+                      new=MockSet(Child(), Child())):
+        dad = Person()
+
+        # Actual test
+        dependent_count = dad.count_dependents()
+
+        # Validation
+        assert dependent_count == 2, dependent_count
+
+We're still working out the best way to mock out portions of the Django
+framework. Our current [strategy][] is a method called `setup_mock_relations()`
+that walks through all the related fields on a model class, and replaces them
+with mock versions.
+
+[mock_queries]: https://github.com/stphivos/django-mock-queries
+[strategy]: https://github.com/cfe-lab/Kive/blob/master/kive/kive/mock_setup.py
+
 ## Further Reading ##
 Read this series of blog posts on [writing unit tests][test blog]. Find
 [further discussion][discuss] of [unit tests as specs][langr] or
@@ -151,3 +312,4 @@ series.
 [example]: http://martinfowler.com/bliki/SpecificationByExample.html
 [test infected]: http://junit.sourceforge.net/doc/testinfected/testing.htm
 [xunit]: http://books.google.ca/books?id=-izOiCEIABQC
+[source code]: https://github.com/donkirkby/testing

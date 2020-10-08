@@ -1,6 +1,3 @@
-defaults:
-  -
-    scope:
-      path: "" # an empty string here means all files in the project
-    values:
-      layout: "default"
+remote_theme: chrisrhymes/bulma-clean-theme
+title: Testing Python
+google_analytics: UA-4644630-2

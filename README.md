@@ -1,10 +1,10 @@
-# testing
+## Testing Python
 Essay and sample code for writing unit tests in Python
 
-Read the essay at [donkirkby.github.com/testing][site], or see the
+Read the essay at [donkirkby.github.io/testing][site], or see the
 [presentation][].
 
-[site]: http://donkirkby.github.com/testing
+[site]: https://donkirkby.github.io/testing
 [presentation]: https://docs.google.com/presentation/d/1xZUsogi29wjoPJI-eKKLAFlVvTAlydrYD8HUWsDrhVk/edit?usp=sharing
 
 The source code includes the following:

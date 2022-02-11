@@ -90,3 +90,7 @@ ENV/
 /udjango.db
 /.project
 /.pydevproject
+
+.idea/misc.xml
+.idea/inspectionProfiles
+.idea/workspace.xml

@@ -65,7 +65,7 @@ shown what will happen when the class is abused.
 
 I posted the full sample code for you to play with at [github.com][sample].
 
-[langr]: http://langrsoft.com/2006/06/05/are-tests-specs/
+[langr]: https://www.langrsoft.com/2006/06/06/are-tests-specs/
 [sample]: https://github.com/donkirkby/testing
 
 ## Whaddya mean, test driven? ##
